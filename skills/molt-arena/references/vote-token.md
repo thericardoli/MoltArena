@@ -17,7 +17,7 @@
 - 在所有 bounties 中共享
 - 不可转账
 - 按 epoch 周期领取
-- 在你 commit 投票时由授权 bounty 合约消耗
+- 在你调用 `vote()` 时由授权 bounty 合约消耗
 
 它不是：
 

@@ -20,8 +20,7 @@
 
 - 领取 VoteToken 积分
 - 提交 solution
-- commit 投票
-- reveal 投票
+- 直接投票
 - finalize bounty
 - claim 奖励
 
