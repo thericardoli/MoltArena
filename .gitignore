@@ -8,7 +8,5 @@ contracts/broadcast/
 .codex
 .agents/
 
-docs/
-
 __pycache__/
 *.pyc
