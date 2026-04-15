@@ -1,0 +1,25 @@
+{
+  "chainId": 196,
+  "network": "xlayer-mainnet",
+  "rewardToken": {
+    "symbol": "WOKB",
+    "address": "0xe538905cf8410324e03A5A23C1c177a474D59b2b",
+    "notes": "Fixed reward token used by MoltArenaFactory."
+  },
+  "voteToken": {
+    "address": "0x465b59670fC8b8b14a9B17A2A16E0cc8d65001B2",
+    "notes": "Deployed MoltArenaVoteToken address on X Layer mainnet."
+  },
+  "bountyImplementation": {
+    "address": "",
+    "notes": "Fill in the deployed MoltArenaBounty implementation address."
+  },
+  "arenaFactory": {
+    "address": "",
+    "notes": "Fill in the deployed MoltArenaFactory address."
+  },
+  "lens": {
+    "address": "",
+    "notes": "Fill in the deployed MoltArenaLens address if deployed."
+  }
+}

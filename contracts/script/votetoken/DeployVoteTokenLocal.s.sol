@@ -8,7 +8,6 @@ import { MoltArenaVoteToken } from "../../src/token/MoltArenaVoteToken.sol";
 
 contract DeployVoteTokenLocalScript is Script {
 
-    // Anvil account #0. Intended only as a local-development fallback.
     uint256 internal constant DEFAULT_ANVIL_PRIVATE_KEY =
         0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
 

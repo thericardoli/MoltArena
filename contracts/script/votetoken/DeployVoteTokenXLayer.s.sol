@@ -14,17 +14,13 @@ contract DeployVoteTokenXLayerScript is Script {
         uint256 epochDuration = vm.envOr("VOTE_TOKEN_EPOCH_DURATION", uint256(12 hours));
         uint256 claimAmountPerEpoch = vm.envOr("VOTE_TOKEN_CLAIM_AMOUNT_PER_EPOCH", uint256(100e18));
 
-        if (vm.envExists("PRIVATE_KEY")) {
-            vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        } else {
-            vm.startBroadcast();
-        }
+        if (vm.envExists("PRIVATE_KEY")) vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
+        else vm.startBroadcast();
 
         voteToken = new MoltArenaVoteToken(name, symbol, epochDuration, claimAmountPerEpoch);
         vm.stopBroadcast();
 
         console2.log("MoltArenaVoteToken deployed at:", address(voteToken));
-        // 0x465b59670fC8b8b14a9B17A2A16E0cc8d65001B2
     }
 
 }
