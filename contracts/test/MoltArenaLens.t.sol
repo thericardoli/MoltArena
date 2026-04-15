@@ -41,9 +41,7 @@ contract MoltArenaLensTest is Test {
     }
 
     function testGetBountyAddressMatchesFactoryRegistry() public {
-        uint256 bountyId;
-        address bountyAddress;
-        (bountyId, bountyAddress) = _createDefaultBounty();
+        (uint256 bountyId, address bountyAddress) = _createDefaultBounty();
 
         assertEq(lens.getBountyAddress(bountyId), bountyAddress);
     }
@@ -69,22 +67,17 @@ contract MoltArenaLensTest is Test {
     }
 
     function testGetBountyTimingReturnsCloneDeadlines() public {
-        uint256 bountyId;
-        address bountyAddress;
-        (bountyId, bountyAddress) = _createDefaultBounty();
+        (uint256 bountyId, address bountyAddress) = _createDefaultBounty();
         MoltArenaTypes.Bounty memory bounty = IMoltArenaBounty(bountyAddress).getBounty();
 
         MoltArenaTypes.BountyTiming memory timing = lens.getBountyTiming(bountyId);
 
         assertEq(uint256(timing.submissionDeadline), uint256(bounty.submissionDeadline));
-        assertEq(uint256(timing.commitDeadline), uint256(bounty.commitDeadline));
-        assertEq(uint256(timing.revealDeadline), uint256(bounty.revealDeadline));
+        assertEq(uint256(timing.voteDeadline), uint256(bounty.voteDeadline));
     }
 
     function testGetSubmissionIdsReflectsCloneRegistration() public {
-        uint256 bountyId;
-        address bountyAddress;
-        (bountyId, bountyAddress) = _createDefaultBounty();
+        (uint256 bountyId, address bountyAddress) = _createDefaultBounty();
         IMoltArenaBounty bounty = IMoltArenaBounty(bountyAddress);
 
         vm.prank(solver);
@@ -97,9 +90,7 @@ contract MoltArenaLensTest is Test {
     }
 
     function testGetEligibleSubmissionIdsReflectsEligibilityUpdates() public {
-        uint256 bountyId;
-        address bountyAddress;
-        (bountyId, bountyAddress) = _createDefaultBounty();
+        (uint256 bountyId, address bountyAddress) = _createDefaultBounty();
         IMoltArenaBounty bounty = IMoltArenaBounty(bountyAddress);
 
         vm.prank(solver);
@@ -117,12 +108,30 @@ contract MoltArenaLensTest is Test {
         assertEq(ids[0], 1);
     }
 
-    function testAvailableVoteCreditsReturnsBountyCapWhenWalletBalanceIsHigher() public {
-        (uint256 bountyId,) = _createDefaultBounty();
+    function testAvailableVoteCreditsReturnsZeroAfterVote() public {
+        (uint256 bountyId, address bountyAddress) = _createDefaultBounty();
+        IMoltArenaBounty bounty = IMoltArenaBounty(bountyAddress);
+
+        vm.prank(solver);
+        bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
+        vm.prank(creator);
+        bounty.submitSolution("https://www.moltbook.com/post/creator-1", keccak256("creator-1"));
+
         vm.prank(voter);
         voteToken.claim();
-
         assertEq(lens.availableVoteCredits(voter, bountyId), 15e18);
+
+        vm.warp(bounty.getBounty().submissionDeadline);
+        uint256[] memory submissionIds = new uint256[](1);
+        submissionIds[0] = 1;
+        uint96[] memory credits = new uint96[](1);
+        credits[0] = 10e18;
+
+        vm.prank(voter);
+        bounty.vote(submissionIds, credits);
+
+        assertEq(lens.availableVoteCredits(voter, bountyId), 0);
+        assertEq(lens.usedVoteCredits(voter, bountyId), 10e18);
     }
 
     function _createDefaultBounty() internal returns (uint256 bountyId, address bountyAddress) {
@@ -134,8 +143,7 @@ contract MoltArenaLensTest is Test {
             maxVoteCreditsPerVoter: 15e18,
             winnerCount: 2,
             submissionDeadline: uint40(block.timestamp + 1 days),
-            commitDeadline: uint40(block.timestamp + 2 days),
-            revealDeadline: uint40(block.timestamp + 3 days)
+            voteDeadline: uint40(block.timestamp + 2 days)
         });
 
         vm.startPrank(creator, creator);

@@ -24,8 +24,8 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
     mapping(uint256 submissionId => MoltArenaTypes.Submission submission) private _submissions;
     mapping(address account => bool submitted) private _hasSubmitted;
     mapping(address submitter => uint256 submissionId) private _submissionIdBySubmitter;
-    mapping(address voter => MoltArenaTypes.VoteCommit voteCommit) private _voteCommits;
-    mapping(address voter => mapping(uint256 submissionId => uint96 credits)) private _revealedCreditsByVoterSubmission;
+    mapping(address voter => MoltArenaTypes.VoteRecord voteRecord) private _voteRecords;
+    mapping(address voter => mapping(uint256 submissionId => uint96 credits)) private _creditedVotesByVoterSubmission;
     mapping(address voter => uint256 supportCredits) private _winnerSupportByVoter;
     uint256[] private _submissionIds;
     address[] private _voters;
@@ -64,12 +64,11 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
         if (params.rewardAmount == 0) revert RewardAmountZero();
         if (params.maxVoteCreditsPerVoter == 0) revert MaxVoteCreditsPerVoterZero();
         if (params.winnerCount == 0) revert WinnerCountZero();
-        if (
-            params.submissionDeadline <= block.timestamp || params.commitDeadline <= params.submissionDeadline
-                || params.revealDeadline <= params.commitDeadline
-        ) revert InvalidDeadlineOrder();
+        if (params.submissionDeadline <= block.timestamp || params.voteDeadline <= params.submissionDeadline) {
+            revert InvalidDeadlineOrder();
+        }
 
-        uint256 requestedWindow = uint256(params.revealDeadline) - uint256(params.submissionDeadline);
+        uint256 requestedWindow = uint256(params.voteDeadline) - uint256(params.submissionDeadline);
         if (requestedWindow > maxVoteWindow()) revert VoteWindowTooLong(requestedWindow, maxVoteWindow());
 
         uint96 winnerPool = uint96(
@@ -92,12 +91,11 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
             maxVoteCreditsPerVoter: params.maxVoteCreditsPerVoter,
             winnerCount: params.winnerCount,
             submissionDeadline: params.submissionDeadline,
-            commitDeadline: params.commitDeadline,
-            revealDeadline: params.revealDeadline,
+            voteDeadline: params.voteDeadline,
             submissionCount: 0,
             eligibleSubmissionCount: 0,
             finalizedWinnerCount: 0,
-            validRevealCount: 0,
+            validVoterCount: 0,
             finalized: false,
             status: MoltArenaTypes.BountyStatus.SubmissionOpen
         });
@@ -169,95 +167,59 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
         emit SubmissionEligibilityUpdated(bountyId, submissionId, eligible, contextHash);
     }
 
-    function commitVote(
-        bytes32 commitHash,
-        uint96 creditsToLock
+    function vote(
+        uint256[] calldata submissionIds,
+        uint96[] calldata credits
     ) external override {
         MoltArenaTypes.Bounty storage bounty = _bounty;
         MoltArenaTypes.BountyStatus actualStatus = _currentStatus(bounty);
-        if (actualStatus != MoltArenaTypes.BountyStatus.CommitOpen) {
-            revert BountyPhaseMismatch(bountyId, MoltArenaTypes.BountyStatus.CommitOpen, actualStatus);
+        if (actualStatus != MoltArenaTypes.BountyStatus.VoteOpen) {
+            revert BountyPhaseMismatch(bountyId, MoltArenaTypes.BountyStatus.VoteOpen, actualStatus);
         }
         if (bounty.submissionCount == 0) revert NoSubmissions(bountyId);
         if (bounty.eligibleSubmissionCount == 0) revert NoEligibleSubmissions(bountyId);
-        if (commitHash == bytes32(0)) revert InvalidCommitHash();
-        if (creditsToLock == 0) revert InvalidVoteCredits(creditsToLock);
-        if (creditsToLock > bounty.maxVoteCreditsPerVoter) {
-            revert VotePerAddressCapExceeded(bountyId, msg.sender, creditsToLock, bounty.maxVoteCreditsPerVoter);
-        }
 
-        MoltArenaTypes.VoteCommit storage voteCommit = _voteCommits[msg.sender];
-        if (voteCommit.commitHash != bytes32(0)) revert VoteAlreadyCommitted(bountyId, msg.sender);
+        MoltArenaTypes.VoteRecord storage voteRecord = _voteRecords[msg.sender];
+        if (voteRecord.usedCredits != 0) revert VoteAlreadyCast(bountyId, msg.sender);
 
-        uint256 available = voteToken.balanceOf(msg.sender);
-        if (available < creditsToLock) revert VoteBudgetExceeded(bountyId, msg.sender, creditsToLock, available);
+        uint256 length = submissionIds.length;
+        if (length == 0) revert InvalidVoteCredits(0);
+        if (length != credits.length) revert ArrayLengthMismatch(length, credits.length);
 
-        voteToken.consume(msg.sender, creditsToLock);
-        voteCommit.commitHash = commitHash;
-        voteCommit.lockedCredits = creditsToLock;
-        _voters.push(msg.sender);
-
-        emit VoteCommitted(bountyId, msg.sender, commitHash, creditsToLock);
-    }
-
-    function hashVoteAllocation(
-        address voter,
-        uint256[] calldata submissionIds,
-        uint96[] calldata credits,
-        bytes32 salt
-    ) public view override returns (bytes32) {
-        return keccak256(abi.encode(bountyId, voter, submissionIds, credits, salt));
-    }
-
-    function revealVote(
-        MoltArenaTypes.RevealVoteParams calldata params
-    ) external override {
-        MoltArenaTypes.Bounty storage bounty = _bounty;
-        MoltArenaTypes.BountyStatus actualStatus = _currentStatus(bounty);
-        if (actualStatus != MoltArenaTypes.BountyStatus.RevealOpen) {
-            revert BountyPhaseMismatch(bountyId, MoltArenaTypes.BountyStatus.RevealOpen, actualStatus);
-        }
-
-        MoltArenaTypes.VoteCommit storage voteCommit = _voteCommits[msg.sender];
-        if (voteCommit.commitHash == bytes32(0)) revert VoteNotCommitted(bountyId, msg.sender);
-        if (voteCommit.revealed) revert VoteAlreadyRevealed(bountyId, msg.sender);
-
-        uint256 length = params.submissionIds.length;
-        if (length == 0) revert InvalidRevealPayload();
-        if (length != params.credits.length) revert ArrayLengthMismatch(length, params.credits.length);
-
-        uint256 revealedTotal;
+        uint256 totalCredits;
         for (uint256 i; i < length; ++i) {
-            uint256 submissionId = params.submissionIds[i];
+            uint256 submissionId = submissionIds[i];
             MoltArenaTypes.Submission storage submission = _submissions[submissionId];
             if (submission.submitter == address(0)) revert SubmissionNotFound(bountyId, submissionId);
             if (submission.submitter == msg.sender) revert SelfVoteNotAllowed(bountyId, msg.sender, submissionId);
             if (!submission.settlementEligible) revert SubmissionNotEligible(bountyId, submissionId);
 
             for (uint256 j; j < i; ++j) {
-                if (params.submissionIds[j] == submissionId) revert DuplicateSubmissionInReveal(submissionId);
+                if (submissionIds[j] == submissionId) revert DuplicateSubmissionInVote(submissionId);
             }
 
-            revealedTotal += params.credits[i];
+            totalCredits += credits[i];
         }
 
-        if (revealedTotal != voteCommit.lockedCredits) {
-            revert RevealCreditsMismatch(bountyId, msg.sender, voteCommit.lockedCredits, revealedTotal);
+        if (totalCredits == 0) revert InvalidVoteCredits(0);
+        if (totalCredits > bounty.maxVoteCreditsPerVoter) {
+            revert VotePerAddressCapExceeded(bountyId, msg.sender, totalCredits, bounty.maxVoteCreditsPerVoter);
         }
 
-        bytes32 computedHash = hashVoteAllocation(msg.sender, params.submissionIds, params.credits, params.salt);
-        if (computedHash != voteCommit.commitHash) revert InvalidRevealPayload();
+        uint256 available = voteToken.balanceOf(msg.sender);
+        if (available < totalCredits) revert VoteBudgetExceeded(bountyId, msg.sender, totalCredits, available);
 
+        voteToken.consume(msg.sender, totalCredits);
         for (uint256 i; i < length; ++i) {
-            MoltArenaTypes.Submission storage submission = _submissions[params.submissionIds[i]];
-            submission.finalVotes += params.credits[i];
-            _revealedCreditsByVoterSubmission[msg.sender][params.submissionIds[i]] = params.credits[i];
+            MoltArenaTypes.Submission storage submission = _submissions[submissionIds[i]];
+            submission.finalVotes += credits[i];
+            _creditedVotesByVoterSubmission[msg.sender][submissionIds[i]] = credits[i];
         }
 
-        voteCommit.revealed = true;
-        voteCommit.revealedCredits = voteCommit.lockedCredits;
+        voteRecord.usedCredits = uint96(totalCredits);
+        _voters.push(msg.sender);
 
-        emit VoteRevealed(bountyId, msg.sender, computedHash, voteCommit.revealedCredits);
+        emit VoteCast(bountyId, msg.sender, uint96(totalCredits));
     }
 
     function finalizeBounty() external override {
@@ -269,7 +231,7 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
             revert BountyPhaseMismatch(bountyId, MoltArenaTypes.BountyStatus.Expired, actualStatus);
         }
         if (bounty.submissionCount == 0 || bounty.eligibleSubmissionCount == 0) {
-            bounty.validRevealCount = 0;
+            bounty.validVoterCount = 0;
             bounty.finalizedWinnerCount = 0;
             bounty.finalized = true;
             bounty.status = MoltArenaTypes.BountyStatus.Finalized;
@@ -284,8 +246,8 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
         if (winnerSlots > bounty.eligibleSubmissionCount) winnerSlots = bounty.eligibleSubmissionCount;
         uint256[] memory orderedIds = _selectTopWinnerSubmissionIds(winnerSlots);
 
-        uint256 validRevealCount = _countValidReveals();
-        bounty.validRevealCount = uint32(validRevealCount);
+        uint256 validVoterCount = _voters.length;
+        bounty.validVoterCount = uint32(validVoterCount);
         bounty.finalizedWinnerCount = uint32(winnerSlots);
         bounty.finalized = true;
         bounty.status = MoltArenaTypes.BountyStatus.Finalized;
@@ -298,7 +260,7 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
 
         _computeCuratorSupportForWinners();
 
-        emit BountyFinalized(bountyId, _winnerSubmissionIds, validRevealCount);
+        emit BountyFinalized(bountyId, _winnerSubmissionIds, validVoterCount);
     }
 
     function claimWinnerReward() external override returns (uint256 amount) {
@@ -329,15 +291,15 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
             revert BountyPhaseMismatch(bountyId, MoltArenaTypes.BountyStatus.Finalized, status);
         }
 
-        MoltArenaTypes.VoteCommit storage voteCommit = _voteCommits[msg.sender];
-        if (!voteCommit.revealed) revert NoCuratorReward(bountyId, msg.sender);
-        if (voteCommit.curatorRewardClaimed) revert RewardAlreadyClaimed(bountyId, msg.sender);
+        MoltArenaTypes.VoteRecord storage voteRecord = _voteRecords[msg.sender];
+        if (voteRecord.usedCredits == 0) revert NoCuratorReward(bountyId, msg.sender);
+        if (voteRecord.curatorRewardClaimed) revert RewardAlreadyClaimed(bountyId, msg.sender);
 
         uint256 voterSupport = _winnerSupportByVoter[msg.sender];
         if (voterSupport == 0 || _totalWinnerSupportCredits == 0) revert NoCuratorReward(bountyId, msg.sender);
 
         amount = (uint256(bounty.curatorPool) * voterSupport) / _totalWinnerSupportCredits;
-        voteCommit.curatorRewardClaimed = true;
+        voteRecord.curatorRewardClaimed = true;
         rewardToken.safeTransfer(msg.sender, amount);
 
         emit CuratorRewardClaimed(bountyId, msg.sender, amount);
@@ -367,10 +329,10 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
         winnerSubmissionIds = _winnerSubmissionIds;
     }
 
-    function getVoteCommit(
+    function getVoteRecord(
         address voter
-    ) external view override returns (MoltArenaTypes.VoteCommit memory voteCommit) {
-        voteCommit = _voteCommits[voter];
+    ) external view override returns (MoltArenaTypes.VoteRecord memory voteRecord) {
+        voteRecord = _voteRecords[voter];
     }
 
     function hasSubmitted(
@@ -393,10 +355,10 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
             }
         }
 
-        MoltArenaTypes.VoteCommit storage voteCommit = _voteCommits[account];
+        MoltArenaTypes.VoteRecord storage voteRecord = _voteRecords[account];
         uint256 voterSupport = _winnerSupportByVoter[account];
         if (
-            !voteCommit.curatorRewardClaimed && voteCommit.revealed && voterSupport > 0
+            !voteRecord.curatorRewardClaimed && voteRecord.usedCredits > 0 && voterSupport > 0
                 && _totalWinnerSupportCredits > 0
         ) rewards.curatorReward = (uint256(bounty.curatorPool) * voterSupport) / _totalWinnerSupportCredits;
     }
@@ -406,15 +368,8 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
     ) internal view returns (MoltArenaTypes.BountyStatus) {
         if (bounty.status == MoltArenaTypes.BountyStatus.Cancelled || bounty.finalized) return bounty.status;
         if (block.timestamp < bounty.submissionDeadline) return MoltArenaTypes.BountyStatus.SubmissionOpen;
-        if (block.timestamp < bounty.commitDeadline) return MoltArenaTypes.BountyStatus.CommitOpen;
-        if (block.timestamp < bounty.revealDeadline) return MoltArenaTypes.BountyStatus.RevealOpen;
+        if (block.timestamp < bounty.voteDeadline) return MoltArenaTypes.BountyStatus.VoteOpen;
         return MoltArenaTypes.BountyStatus.Expired;
-    }
-
-    function _countValidReveals() internal view returns (uint256 count) {
-        for (uint256 i; i < _voters.length; ++i) {
-            if (_voteCommits[_voters[i]].revealed) ++count;
-        }
     }
 
     function _shouldRankBefore(
@@ -472,12 +427,9 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
     function _computeCuratorSupportForWinners() internal {
         for (uint256 i; i < _voters.length; ++i) {
             address voter = _voters[i];
-            MoltArenaTypes.VoteCommit storage voteCommit = _voteCommits[voter];
-            if (!voteCommit.revealed) continue;
-
             uint256 support;
             for (uint256 j; j < _winnerSubmissionIds.length; ++j) {
-                support += _revealedCreditsByVoterSubmission[voter][_winnerSubmissionIds[j]];
+                support += _creditedVotesByVoterSubmission[voter][_winnerSubmissionIds[j]];
             }
 
             _winnerSupportByVoter[voter] = support;

@@ -22,11 +22,9 @@ interface IMoltArenaBounty {
         bytes32 contextHash
     );
 
-    event VoteCommitted(uint256 indexed bountyId, address indexed voter, bytes32 commitHash, uint96 lockedCredits);
+    event VoteCast(uint256 indexed bountyId, address indexed voter, uint96 usedCredits);
 
-    event VoteRevealed(uint256 indexed bountyId, address indexed voter, bytes32 allocationHash, uint96 revealedCredits);
-
-    event BountyFinalized(uint256 indexed bountyId, uint256[] winnerSubmissionIds, uint256 validRevealCount);
+    event BountyFinalized(uint256 indexed bountyId, uint256[] winnerSubmissionIds, uint256 validVoterCount);
     event CreatorRefunded(uint256 indexed bountyId, address indexed creator, uint256 refundedAmount);
 
     event WinnerRewardClaimed(uint256 indexed bountyId, address indexed claimer, uint256 amount);
@@ -48,18 +46,13 @@ interface IMoltArenaBounty {
     );
     error SubmissionNotFound(uint256 bountyId, uint256 submissionId);
     error SubmissionAlreadyExists(uint256 bountyId, address submitter);
-    error VoteAlreadyCommitted(uint256 bountyId, address voter);
-    error VoteNotCommitted(uint256 bountyId, address voter);
-    error VoteAlreadyRevealed(uint256 bountyId, address voter);
+    error VoteAlreadyCast(uint256 bountyId, address voter);
     error SelfVoteNotAllowed(uint256 bountyId, address voter, uint256 submissionId);
     error SubmissionNotEligible(uint256 bountyId, uint256 submissionId);
-    error InvalidCommitHash();
     error InvalidVoteCredits(uint256 requested);
     error InvalidMoltbookReference();
     error ArrayLengthMismatch(uint256 leftLength, uint256 rightLength);
-    error RevealCreditsMismatch(uint256 bountyId, address voter, uint256 expected, uint256 actual);
-    error DuplicateSubmissionInReveal(uint256 submissionId);
-    error InvalidRevealPayload();
+    error DuplicateSubmissionInVote(uint256 submissionId);
     error VoteBudgetExceeded(uint256 bountyId, address voter, uint256 requested, uint256 available);
     error VotePerAddressCapExceeded(uint256 bountyId, address voter, uint256 requested, uint256 maxAllowed);
     error NoSubmissions(uint256 bountyId);
@@ -104,20 +97,9 @@ interface IMoltArenaBounty {
         bytes32 contextHash
     ) external;
 
-    function commitVote(
-        bytes32 commitHash,
-        uint96 creditsToLock
-    ) external;
-
-    function hashVoteAllocation(
-        address voter,
+    function vote(
         uint256[] calldata submissionIds,
-        uint96[] calldata credits,
-        bytes32 salt
-    ) external view returns (bytes32);
-
-    function revealVote(
-        MoltArenaTypes.RevealVoteParams calldata params
+        uint96[] calldata credits
     ) external;
 
     function finalizeBounty() external;
@@ -138,9 +120,9 @@ interface IMoltArenaBounty {
 
     function getWinnerSubmissionIds() external view returns (uint256[] memory winnerSubmissionIds);
 
-    function getVoteCommit(
+    function getVoteRecord(
         address voter
-    ) external view returns (MoltArenaTypes.VoteCommit memory voteCommit);
+    ) external view returns (MoltArenaTypes.VoteRecord memory voteRecord);
 
     function hasSubmitted(
         address account

@@ -55,8 +55,7 @@ contract MoltArenaLens is IMoltArenaLens {
         MoltArenaTypes.Bounty memory bounty = _bountyContract(bountyId).getBounty();
         timing = MoltArenaTypes.BountyTiming({
             submissionDeadline: bounty.submissionDeadline,
-            commitDeadline: bounty.commitDeadline,
-            revealDeadline: bounty.revealDeadline
+            voteDeadline: bounty.voteDeadline
         });
     }
 
@@ -99,18 +98,17 @@ contract MoltArenaLens is IMoltArenaLens {
         address account,
         uint256 bountyId
     ) external view override returns (uint256) {
+        if (_bountyContract(bountyId).getVoteRecord(account).usedCredits > 0) return 0;
         uint256 balance = VOTE_TOKEN.balanceOf(account);
         uint256 maxVoteCreditsPerVoter = _bountyContract(bountyId).getBounty().maxVoteCreditsPerVoter;
         return balance < maxVoteCreditsPerVoter ? balance : maxVoteCreditsPerVoter;
     }
 
-    function lockedVoteCredits(
+    function usedVoteCredits(
         address account,
         uint256 bountyId
     ) external view override returns (uint256) {
-        MoltArenaTypes.VoteCommit memory voteCommit = _bountyContract(bountyId).getVoteCommit(account);
-        if (voteCommit.lockedCredits <= voteCommit.revealedCredits) return 0;
-        return voteCommit.lockedCredits - voteCommit.revealedCredits;
+        return _bountyContract(bountyId).getVoteRecord(account).usedCredits;
     }
 
     function _bountyContract(

@@ -112,9 +112,8 @@ contract MoltArenaFactory is Ownable, IMoltArenaFactory {
             params.maxVoteCreditsPerVoter,
             params.winnerCount,
             params.submissionDeadline,
-            params.commitDeadline,
-            params.revealDeadline
+            params.voteDeadline
         );
     }
 
-}
+    }

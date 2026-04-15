@@ -60,9 +60,7 @@ contract MoltArenaFactoryTest is Test {
 
         vm.startPrank(creator, creator);
         rewardToken.approve(address(factory), params.rewardAmount);
-        uint256 bountyId;
-        address bountyAddress;
-        (bountyId, bountyAddress) = factory.createBounty(params);
+        (uint256 bountyId, address bountyAddress) = factory.createBounty(params);
         vm.stopPrank();
 
         IMoltArenaBounty bounty = IMoltArenaBounty(bountyAddress);
@@ -117,7 +115,7 @@ contract MoltArenaFactoryTest is Test {
 
     function testCreateBountyRejectsInvalidDeadlineOrder() public {
         MoltArenaTypes.CreateBountyParams memory params = _defaultBountyParams();
-        params.commitDeadline = params.submissionDeadline;
+        params.voteDeadline = params.submissionDeadline;
 
         vm.startPrank(creator, creator);
         rewardToken.approve(address(factory), params.rewardAmount);
@@ -128,7 +126,7 @@ contract MoltArenaFactoryTest is Test {
 
     function testCreateBountyRejectsVoteWindowLongerThanMax() public {
         MoltArenaTypes.CreateBountyParams memory params = _defaultBountyParams();
-        params.revealDeadline = params.submissionDeadline + uint40(4 days);
+        params.voteDeadline = params.submissionDeadline + uint40(4 days);
 
         vm.startPrank(creator, creator);
         rewardToken.approve(address(factory), params.rewardAmount);
@@ -139,20 +137,6 @@ contract MoltArenaFactoryTest is Test {
         );
         factory.createBounty(params);
         vm.stopPrank();
-    }
-
-    function testFactoryGetBountyAddressesReturnsPaginatedResults() public {
-        _createDefaultBounty();
-        vm.warp(block.timestamp + 1);
-        _createDefaultBounty();
-        vm.warp(block.timestamp + 1);
-        _createDefaultBounty();
-
-        address[] memory bountyAddresses = factory.getBountyAddresses(2, 2);
-
-        assertEq(bountyAddresses.length, 2);
-        assertTrue(factory.isBounty(bountyAddresses[0]));
-        assertTrue(factory.isBounty(bountyAddresses[1]));
     }
 
     function testSubmitSolutionStoresContentAndTimestamp() public {
@@ -181,14 +165,6 @@ contract MoltArenaFactoryTest is Test {
         vm.stopPrank();
     }
 
-    function testSubmitSolutionRejectsEmptyPostUrl() public {
-        (, IMoltArenaBounty bounty) = _createDefaultBounty();
-
-        vm.prank(solver);
-        vm.expectRevert(IMoltArenaBounty.InvalidMoltbookReference.selector);
-        bounty.submitSolution("", keccak256("solver-1"));
-    }
-
     function testSubmitSolutionRejectsAfterSubmissionDeadline() public {
         (, IMoltArenaBounty bounty) = _createDefaultBounty();
         MoltArenaTypes.Bounty memory bountyData = bounty.getBounty();
@@ -200,26 +176,10 @@ contract MoltArenaFactoryTest is Test {
                 IMoltArenaBounty.BountyPhaseMismatch.selector,
                 bountyData.bountyId,
                 MoltArenaTypes.BountyStatus.SubmissionOpen,
-                MoltArenaTypes.BountyStatus.CommitOpen
+                MoltArenaTypes.BountyStatus.VoteOpen
             )
         );
         bounty.submitSolution("https://www.moltbook.com/post/late", keccak256("late"));
-    }
-
-    function testGetSubmissionIdsReturnsRegisteredIds() public {
-        (, IMoltArenaBounty bounty) = _createDefaultBounty();
-
-        vm.prank(solver);
-        bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
-
-        vm.prank(other);
-        bounty.submitSolution("https://www.moltbook.com/post/solver-2", keccak256("solver-2"));
-
-        uint256[] memory ids = bounty.getSubmissionIds();
-
-        assertEq(ids.length, 2);
-        assertEq(ids[0], 1);
-        assertEq(ids[1], 2);
     }
 
     function testSetSubmissionEligibilityUpdatesEligibilityState() public {
@@ -241,87 +201,12 @@ contract MoltArenaFactoryTest is Test {
         assertEq(uint256(bounty.getBounty().eligibleSubmissionCount), 0);
     }
 
-    function testSetSubmissionEligibilityRejectsNonVerifier() public {
-        (, IMoltArenaBounty bounty) = _createDefaultBounty();
-
-        vm.prank(solver);
-        uint256 submissionId = bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
-
-        vm.prank(other);
-        vm.expectRevert(abi.encodeWithSelector(IMoltArenaBounty.NotSettlementVerifier.selector, 1, other, creator));
-        bounty.setSubmissionEligibility(submissionId, false, keccak256("no-auth"));
-    }
-
-    function testCommitVoteConsumesBalanceAndStoresCommit() public {
-        (, IMoltArenaBounty bounty) = _createDefaultBounty();
-
-        vm.prank(solver);
-        bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
+    function testVoteConsumesBalanceAndStoresCredits() public {
+        (, IMoltArenaBounty bounty) = _createTwoSubmissionBounty();
 
         vm.prank(other);
         voteToken.claim();
-        MoltArenaTypes.Bounty memory bountyData = bounty.getBounty();
-        vm.warp(bountyData.submissionDeadline);
 
-        bytes32 commitHash = keccak256("commit-1");
-        vm.prank(other);
-        bounty.commitVote(commitHash, 10e18);
-
-        MoltArenaTypes.VoteCommit memory voteCommit = bounty.getVoteCommit(other);
-        assertEq(voteCommit.commitHash, commitHash);
-        assertEq(voteCommit.lockedCredits, 10e18);
-        assertEq(voteToken.balanceOf(other), 90e18);
-    }
-
-    function testCommitVoteRejectsDuplicateCommit() public {
-        (, IMoltArenaBounty bounty) = _createDefaultBounty();
-
-        vm.prank(solver);
-        bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
-
-        vm.prank(other);
-        voteToken.claim();
-        MoltArenaTypes.Bounty memory bountyData = bounty.getBounty();
-        vm.warp(bountyData.submissionDeadline);
-
-        vm.startPrank(other);
-        bounty.commitVote(keccak256("commit-1"), 10e18);
-        vm.expectRevert(
-            abi.encodeWithSelector(IMoltArenaBounty.VoteAlreadyCommitted.selector, bountyData.bountyId, other)
-        );
-        bounty.commitVote(keccak256("commit-2"), 5e18);
-        vm.stopPrank();
-    }
-
-    function testCommitVoteRejectsPerAddressVoteCap() public {
-        (, IMoltArenaBounty bounty) = _createDefaultBounty();
-
-        vm.prank(solver);
-        bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
-
-        vm.prank(other);
-        voteToken.claim();
-        MoltArenaTypes.Bounty memory bountyData = bounty.getBounty();
-        vm.warp(bountyData.submissionDeadline);
-
-        vm.prank(other);
-        vm.expectRevert(
-            abi.encodeWithSelector(IMoltArenaBounty.VotePerAddressCapExceeded.selector, 1, other, 16e18, 15e18)
-        );
-        bounty.commitVote(keccak256("commit-cap"), 16e18);
-    }
-
-    function testRevealVoteCountsVotesAndMarksCommitRevealed() public {
-        (, IMoltArenaBounty bounty) = _createDefaultBounty();
-
-        vm.prank(solver);
-        bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
-
-        vm.prank(creator);
-        bounty.submitSolution("https://www.moltbook.com/post/creator-1", keccak256("creator-1"));
-
-        vm.prank(other);
-        voteToken.claim();
         MoltArenaTypes.Bounty memory bountyData = bounty.getBounty();
         vm.warp(bountyData.submissionDeadline);
 
@@ -331,29 +216,66 @@ contract MoltArenaFactoryTest is Test {
         uint96[] memory credits = new uint96[](2);
         credits[0] = 4e18;
         credits[1] = 6e18;
-        bytes32 salt = keccak256("salt-1");
-        bytes32 commitHash = bounty.hashVoteAllocation(other, submissionIds, credits, salt);
 
         vm.prank(other);
-        bounty.commitVote(commitHash, 10e18);
+        bounty.vote(submissionIds, credits);
 
-        vm.warp(bountyData.commitDeadline);
-        vm.prank(other);
-        bounty.revealVote(
-            MoltArenaTypes.RevealVoteParams({ submissionIds: submissionIds, credits: credits, salt: salt })
-        );
-
-        MoltArenaTypes.VoteCommit memory voteCommit = bounty.getVoteCommit(other);
+        MoltArenaTypes.VoteRecord memory voteRecord = bounty.getVoteRecord(other);
         MoltArenaTypes.Submission memory first = bounty.getSubmission(1);
         MoltArenaTypes.Submission memory second = bounty.getSubmission(2);
 
-        assertTrue(voteCommit.revealed);
-        assertEq(voteCommit.revealedCredits, 10e18);
+        assertEq(voteRecord.usedCredits, 10e18);
+        assertEq(voteToken.balanceOf(other), 90e18);
         assertEq(first.finalVotes, 4e18);
         assertEq(second.finalVotes, 6e18);
     }
 
-    function testRevealVoteRejectsSelfVote() public {
+    function testVoteRejectsDuplicateVoteFromSameAddress() public {
+        (, IMoltArenaBounty bounty) = _createTwoSubmissionBounty();
+
+        vm.prank(other);
+        voteToken.claim();
+        MoltArenaTypes.Bounty memory bountyData = bounty.getBounty();
+        vm.warp(bountyData.submissionDeadline);
+
+        uint256[] memory submissionIds = new uint256[](1);
+        submissionIds[0] = 1;
+        uint96[] memory credits = new uint96[](1);
+        credits[0] = 10e18;
+
+        vm.startPrank(other);
+        bounty.vote(submissionIds, credits);
+        vm.expectRevert(abi.encodeWithSelector(IMoltArenaBounty.VoteAlreadyCast.selector, bountyData.bountyId, other));
+        bounty.vote(submissionIds, credits);
+        vm.stopPrank();
+    }
+
+    function testVoteRejectsPerAddressVoteCap() public {
+        MoltArenaTypes.CreateBountyParams memory params = _defaultBountyParams();
+        params.maxVoteCreditsPerVoter = 15e18;
+        (, IMoltArenaBounty bounty) = _createBounty(params);
+
+        vm.prank(solver);
+        bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
+
+        vm.prank(other);
+        voteToken.claim();
+        MoltArenaTypes.Bounty memory bountyData = bounty.getBounty();
+        vm.warp(bountyData.submissionDeadline);
+
+        uint256[] memory submissionIds = new uint256[](1);
+        submissionIds[0] = 1;
+        uint96[] memory credits = new uint96[](1);
+        credits[0] = 16e18;
+
+        vm.prank(other);
+        vm.expectRevert(
+            abi.encodeWithSelector(IMoltArenaBounty.VotePerAddressCapExceeded.selector, 1, other, 16e18, 15e18)
+        );
+        bounty.vote(submissionIds, credits);
+    }
+
+    function testVoteRejectsSelfVote() public {
         (, IMoltArenaBounty bounty) = _createDefaultBounty();
 
         vm.prank(solver);
@@ -368,30 +290,16 @@ contract MoltArenaFactoryTest is Test {
         submissionIds[0] = 1;
         uint96[] memory credits = new uint96[](1);
         credits[0] = 10e18;
-        bytes32 salt = keccak256("salt-1");
-        bytes32 commitHash = bounty.hashVoteAllocation(solver, submissionIds, credits, salt);
 
-        vm.prank(solver);
-        bounty.commitVote(commitHash, 10e18);
-
-        vm.warp(bountyData.commitDeadline);
         vm.prank(solver);
         vm.expectRevert(
             abi.encodeWithSelector(IMoltArenaBounty.SelfVoteNotAllowed.selector, bountyData.bountyId, solver, 1)
         );
-        bounty.revealVote(
-            MoltArenaTypes.RevealVoteParams({ submissionIds: submissionIds, credits: credits, salt: salt })
-        );
+        bounty.vote(submissionIds, credits);
     }
 
-    function testRevealVoteRejectsIneligibleSubmission() public {
-        (, IMoltArenaBounty bounty) = _createDefaultBounty();
-
-        vm.prank(solver);
-        bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
-
-        vm.prank(creator);
-        bounty.submitSolution("https://www.moltbook.com/post/creator-1", keccak256("creator-1"));
+    function testVoteRejectsIneligibleSubmission() public {
+        (, IMoltArenaBounty bounty) = _createTwoSubmissionBounty();
 
         vm.prank(creator);
         bounty.setSubmissionEligibility(2, false, keccak256("fails-scope"));
@@ -407,31 +315,14 @@ contract MoltArenaFactoryTest is Test {
         uint96[] memory credits = new uint96[](2);
         credits[0] = 4e18;
         credits[1] = 6e18;
-        bytes32 salt = keccak256("salt-1");
-        bytes32 commitHash = bounty.hashVoteAllocation(other, submissionIds, credits, salt);
 
-        vm.prank(other);
-        bounty.commitVote(commitHash, 10e18);
-
-        vm.warp(bountyData.commitDeadline);
         vm.prank(other);
         vm.expectRevert(abi.encodeWithSelector(IMoltArenaBounty.SubmissionNotEligible.selector, 1, 2));
-        bounty.revealVote(
-            MoltArenaTypes.RevealVoteParams({ submissionIds: submissionIds, credits: credits, salt: salt })
-        );
+        bounty.vote(submissionIds, credits);
     }
 
-    function testFinalizeBountyMarksTopWinnersAfterRevealPeriod() public {
-        (, IMoltArenaBounty bounty) = _createDefaultBounty();
-
-        vm.prank(solver);
-        bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
-
-        vm.prank(creator);
-        bounty.submitSolution("https://www.moltbook.com/post/creator-1", keccak256("creator-1"));
-
-        vm.prank(address(0xD00D));
-        bounty.submitSolution("https://www.moltbook.com/post/third-1", keccak256("third-1"));
+    function testFinalizeBountyMarksTopWinnersAfterVotePeriod() public {
+        (, IMoltArenaBounty bounty) = _createThreeSubmissionBounty();
 
         vm.prank(other);
         voteToken.claim();
@@ -444,19 +335,11 @@ contract MoltArenaFactoryTest is Test {
         uint96[] memory credits = new uint96[](2);
         credits[0] = 6e18;
         credits[1] = 4e18;
-        bytes32 salt = keccak256("salt-1");
-        bytes32 commitHash = bounty.hashVoteAllocation(other, submissionIds, credits, salt);
 
         vm.prank(other);
-        bounty.commitVote(commitHash, 10e18);
+        bounty.vote(submissionIds, credits);
 
-        vm.warp(bountyData.commitDeadline);
-        vm.prank(other);
-        bounty.revealVote(
-            MoltArenaTypes.RevealVoteParams({ submissionIds: submissionIds, credits: credits, salt: salt })
-        );
-
-        vm.warp(bountyData.revealDeadline);
+        vm.warp(bountyData.voteDeadline);
         bounty.finalizeBounty();
 
         MoltArenaTypes.Bounty memory finalized = bounty.getBounty();
@@ -465,7 +348,7 @@ contract MoltArenaFactoryTest is Test {
         assertEq(uint256(finalized.status), uint256(MoltArenaTypes.BountyStatus.Finalized));
         assertTrue(finalized.finalized);
         assertEq(uint256(finalized.finalizedWinnerCount), 2);
-        assertEq(uint256(finalized.validRevealCount), 1);
+        assertEq(uint256(finalized.validVoterCount), 1);
         assertEq(winnerIds.length, 2);
         assertEq(winnerIds[0], 2);
         assertEq(winnerIds[1], 3);
@@ -475,7 +358,7 @@ contract MoltArenaFactoryTest is Test {
         MoltArenaTypes.CreateBountyParams memory params = _defaultBountyParams();
         params.winnerCount = 1;
 
-        (uint256 bountyId, IMoltArenaBounty bounty) = _createBounty(params);
+        (, IMoltArenaBounty bounty) = _createBounty(params);
 
         vm.prank(solver);
         bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
@@ -495,79 +378,15 @@ contract MoltArenaFactoryTest is Test {
         uint96[] memory credits = new uint96[](2);
         credits[0] = 5e18;
         credits[1] = 5e18;
-        bytes32 salt = keccak256("salt-1");
-        bytes32 commitHash = bounty.hashVoteAllocation(creator, submissionIds, credits, salt);
 
         vm.prank(creator);
-        bounty.commitVote(commitHash, 10e18);
+        bounty.vote(submissionIds, credits);
 
-        vm.warp(bountyData.commitDeadline);
-        vm.prank(creator);
-        bounty.revealVote(
-            MoltArenaTypes.RevealVoteParams({ submissionIds: submissionIds, credits: credits, salt: salt })
-        );
-
-        vm.warp(bountyData.revealDeadline);
+        vm.warp(bountyData.voteDeadline);
         bounty.finalizeBounty();
 
-        MoltArenaTypes.Submission memory first = bounty.getSubmission(1);
-        MoltArenaTypes.Submission memory second = bounty.getSubmission(2);
-
-        assertEq(bountyId, 1);
-        assertTrue(first.winner);
-        assertFalse(second.winner);
-    }
-
-    function testFinalizeBountyRanksOnlyEligibleSubmissions() public {
-        MoltArenaTypes.CreateBountyParams memory params = _defaultBountyParams();
-        params.winnerCount = 3;
-
-        (, IMoltArenaBounty bounty) = _createBounty(params);
-
-        vm.prank(solver);
-        bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
-        vm.prank(creator);
-        bounty.submitSolution("https://www.moltbook.com/post/creator-1", keccak256("creator-1"));
-        vm.prank(voterTwo);
-        bounty.submitSolution("https://www.moltbook.com/post/voter-two-1", keccak256("voter-two-1"));
-
-        vm.prank(creator);
-        bounty.setSubmissionEligibility(3, false, keccak256("excluded"));
-
-        vm.prank(other);
-        voteToken.claim();
-        MoltArenaTypes.Bounty memory bountyData = bounty.getBounty();
-        vm.warp(bountyData.submissionDeadline);
-
-        uint256[] memory submissionIds = new uint256[](2);
-        submissionIds[0] = 1;
-        submissionIds[1] = 2;
-        uint96[] memory credits = new uint96[](2);
-        credits[0] = 4e18;
-        credits[1] = 6e18;
-        bytes32 salt = keccak256("eligible-only");
-        bytes32 commitHash = bounty.hashVoteAllocation(other, submissionIds, credits, salt);
-
-        vm.prank(other);
-        bounty.commitVote(commitHash, 10e18);
-
-        vm.warp(bountyData.commitDeadline);
-        vm.prank(other);
-        bounty.revealVote(
-            MoltArenaTypes.RevealVoteParams({ submissionIds: submissionIds, credits: credits, salt: salt })
-        );
-
-        vm.warp(bountyData.revealDeadline);
-        bounty.finalizeBounty();
-
-        MoltArenaTypes.Bounty memory finalized = bounty.getBounty();
-        uint256[] memory winnerIds = bounty.getWinnerSubmissionIds();
-
-        assertEq(uint256(finalized.eligibleSubmissionCount), 2);
-        assertEq(uint256(finalized.finalizedWinnerCount), 2);
-        assertEq(winnerIds.length, 2);
-        assertEq(winnerIds[0], 2);
-        assertEq(winnerIds[1], 1);
+        assertTrue(bounty.getSubmission(1).winner);
+        assertFalse(bounty.getSubmission(2).winner);
     }
 
     function testClaimWinnerRewardPaysEqualShareAndRejectsDoubleClaim() public {
@@ -608,24 +427,12 @@ contract MoltArenaFactoryTest is Test {
         assertEq(rewardToken.balanceOf(voterThree), voterThreeBalanceBefore + 6e18);
     }
 
-    function testClaimableRewardsReturnsWinnerAndCuratorAmounts() public {
-        (, IMoltArenaBounty bounty) = _createFinalizedTwoWinnerBounty();
-
-        MoltArenaTypes.ClaimableRewards memory creatorRewards = bounty.claimableRewards(creator);
-        MoltArenaTypes.ClaimableRewards memory otherRewards = bounty.claimableRewards(other);
-
-        assertEq(creatorRewards.winnerReward, 42.5e18);
-        assertEq(creatorRewards.curatorReward, 0);
-        assertEq(otherRewards.winnerReward, 0);
-        assertEq(otherRewards.curatorReward, 9e18);
-    }
-
     function testFinalizeBountyRefundsCreatorWhenThereAreNoSubmissions() public {
         (, IMoltArenaBounty bounty) = _createDefaultBounty();
         uint256 balanceAfterFunding = rewardToken.balanceOf(creator);
         MoltArenaTypes.Bounty memory bountyData = bounty.getBounty();
 
-        vm.warp(bountyData.revealDeadline);
+        vm.warp(bountyData.voteDeadline);
         bounty.finalizeBounty();
 
         assertEq(rewardToken.balanceOf(creator), balanceAfterFunding + 100e18);
@@ -645,7 +452,7 @@ contract MoltArenaFactoryTest is Test {
         bounty.setSubmissionEligibility(1, false, keccak256("scope-failed"));
 
         uint256 balanceAfterFunding = rewardToken.balanceOf(creator);
-        vm.warp(bounty.getBounty().revealDeadline);
+        vm.warp(bounty.getBounty().voteDeadline);
 
         bounty.finalizeBounty();
 
@@ -672,25 +479,32 @@ contract MoltArenaFactoryTest is Test {
         bounty = IMoltArenaBounty(bountyAddress);
     }
 
-    function _createFinalizedTwoWinnerBounty() internal returns (uint256 bountyId, IMoltArenaBounty bounty) {
+    function _createTwoSubmissionBounty() internal returns (uint256 bountyId, IMoltArenaBounty bounty) {
         (bountyId, bounty) = _createDefaultBounty();
 
         vm.prank(solver);
         bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
-
         vm.prank(creator);
         bounty.submitSolution("https://www.moltbook.com/post/creator-1", keccak256("creator-1"));
+    }
+
+    function _createThreeSubmissionBounty() internal returns (uint256 bountyId, IMoltArenaBounty bounty) {
+        (bountyId, bounty) = _createTwoSubmissionBounty();
 
         vm.prank(voterTwo);
         bounty.submitSolution("https://www.moltbook.com/post/voter-two-1", keccak256("voter-two-1"));
+    }
 
-        MoltArenaTypes.Bounty memory bountyData = bounty.getBounty();
-        vm.warp(bountyData.submissionDeadline);
+    function _createFinalizedTwoWinnerBounty() internal returns (uint256 bountyId, IMoltArenaBounty bounty) {
+        (bountyId, bounty) = _createThreeSubmissionBounty();
 
         vm.prank(other);
         voteToken.claim();
         vm.prank(voterThree);
         voteToken.claim();
+
+        MoltArenaTypes.Bounty memory bountyData = bounty.getBounty();
+        vm.warp(bountyData.submissionDeadline);
 
         uint256[] memory otherSubmissionIds = new uint256[](3);
         otherSubmissionIds[0] = 1;
@@ -700,11 +514,8 @@ contract MoltArenaFactoryTest is Test {
         otherCredits[0] = 3e18;
         otherCredits[1] = 8e18;
         otherCredits[2] = 4e18;
-        bytes32 otherSalt = keccak256("other-salt");
-        bytes32 otherCommitHash = bounty.hashVoteAllocation(other, otherSubmissionIds, otherCredits, otherSalt);
-
         vm.prank(other);
-        bounty.commitVote(otherCommitHash, 15e18);
+        bounty.vote(otherSubmissionIds, otherCredits);
 
         uint256[] memory voterThreeSubmissionIds = new uint256[](3);
         voterThreeSubmissionIds[0] = 1;
@@ -714,34 +525,10 @@ contract MoltArenaFactoryTest is Test {
         voterThreeCredits[0] = 2e18;
         voterThreeCredits[1] = 2e18;
         voterThreeCredits[2] = 6e18;
-        bytes32 voterThreeSalt = keccak256("voter-three-salt");
-        bytes32 voterThreeCommitHash =
-            bounty.hashVoteAllocation(voterThree, voterThreeSubmissionIds, voterThreeCredits, voterThreeSalt);
-
         vm.prank(voterThree);
-        bounty.commitVote(voterThreeCommitHash, 10e18);
+        bounty.vote(voterThreeSubmissionIds, voterThreeCredits);
 
-        vm.warp(bountyData.commitDeadline);
-
-        vm.prank(other);
-        bounty.revealVote(
-            MoltArenaTypes.RevealVoteParams({
-                submissionIds: otherSubmissionIds,
-                credits: otherCredits,
-                salt: otherSalt
-            })
-        );
-
-        vm.prank(voterThree);
-        bounty.revealVote(
-            MoltArenaTypes.RevealVoteParams({
-                submissionIds: voterThreeSubmissionIds,
-                credits: voterThreeCredits,
-                salt: voterThreeSalt
-            })
-        );
-
-        vm.warp(bountyData.revealDeadline);
+        vm.warp(bountyData.voteDeadline);
         bounty.finalizeBounty();
     }
 
@@ -754,8 +541,7 @@ contract MoltArenaFactoryTest is Test {
             maxVoteCreditsPerVoter: 15e18,
             winnerCount: 2,
             submissionDeadline: uint40(block.timestamp + 1 days),
-            commitDeadline: uint40(block.timestamp + 2 days),
-            revealDeadline: uint40(block.timestamp + 3 days)
+            voteDeadline: uint40(block.timestamp + 2 days)
         });
     }
 

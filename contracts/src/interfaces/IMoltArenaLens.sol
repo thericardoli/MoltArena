@@ -47,7 +47,7 @@ interface IMoltArenaLens {
         uint256 bountyId
     ) external view returns (uint256);
 
-    function lockedVoteCredits(
+    function usedVoteCredits(
         address account,
         uint256 bountyId
     ) external view returns (uint256);

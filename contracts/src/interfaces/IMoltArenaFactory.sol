@@ -19,8 +19,7 @@ interface IMoltArenaFactory {
         uint96 maxVoteCreditsPerVoter,
         uint16 winnerCount,
         uint40 submissionDeadline,
-        uint40 commitDeadline,
-        uint40 revealDeadline
+        uint40 voteDeadline
     );
 
     event ImplementationUpdated(address indexed previousImplementation, address indexed newImplementation);

@@ -8,15 +8,13 @@ library MoltArenaTypes {
         None,
         /// @notice The bounty is accepting new submissions.
         SubmissionOpen,
-        /// @notice The submission phase is closed and blinded vote commitments are open.
-        CommitOpen,
-        /// @notice Vote commitments are closed and voters may reveal their allocations.
-        RevealOpen,
+        /// @notice The submission phase is closed and direct voting is open.
+        VoteOpen,
         /// @notice Winners and rewards have been finalized and claims are enabled.
         Finalized,
         /// @notice The bounty was cancelled and its reward pool was returned.
         Cancelled,
-        /// @notice The reveal period has ended but the bounty has not yet been finalized.
+        /// @notice The voting period has ended but the bounty has not yet been finalized.
         Expired
     }
 
@@ -35,10 +33,8 @@ library MoltArenaTypes {
         uint16 winnerCount;
         /// @notice Timestamp after which new submissions are no longer accepted.
         uint40 submissionDeadline;
-        /// @notice Timestamp after which new vote commitments are no longer accepted.
-        uint40 commitDeadline;
-        /// @notice Timestamp after which vote reveals are no longer accepted.
-        uint40 revealDeadline;
+        /// @notice Timestamp after which new votes are no longer accepted.
+        uint40 voteDeadline;
     }
 
     struct Bounty {
@@ -64,18 +60,16 @@ library MoltArenaTypes {
         uint16 winnerCount;
         /// @notice End of the submission phase.
         uint40 submissionDeadline;
-        /// @notice End of the commit phase.
-        uint40 commitDeadline;
-        /// @notice End of the reveal phase.
-        uint40 revealDeadline;
+        /// @notice End of the voting phase.
+        uint40 voteDeadline;
         /// @notice Total number of submissions registered for the bounty.
         uint32 submissionCount;
         /// @notice Number of submissions currently eligible to participate in settlement.
         uint32 eligibleSubmissionCount;
         /// @notice Number of winner slots actually filled during finalization.
         uint32 finalizedWinnerCount;
-        /// @notice Number of voters that revealed a valid allocation before finalization.
-        uint32 validRevealCount;
+        /// @notice Number of voters that cast a valid vote before finalization.
+        uint32 validVoterCount;
         /// @notice Whether finalization has been executed.
         bool finalized;
         /// @notice Current derived or terminal status of the bounty.
@@ -97,7 +91,7 @@ library MoltArenaTypes {
         bytes32 eligibilityContextHash;
         /// @notice Timestamp when the submission was registered onchain.
         uint40 submittedAt;
-        /// @notice Total revealed vote credits counted toward this submission.
+        /// @notice Total vote credits counted toward this submission.
         uint96 finalVotes;
         /// @notice Whether this submission is currently allowed to participate in settlement.
         bool settlementEligible;
@@ -107,28 +101,11 @@ library MoltArenaTypes {
         bool rewardClaimed;
     }
 
-    struct VoteCommit {
-        /// @notice Hash of the committed vote allocation payload.
-        bytes32 commitHash;
-        /// @notice Amount of vote credits consumed and locked at commit time.
-        uint96 lockedCredits;
-        /// @notice Amount of vote credits successfully revealed.
-        uint96 revealedCredits;
-        /// @notice Whether the voter has completed the reveal step.
-        bool revealed;
-        /// @notice Reserved flag for forfeited vote logic on invalid or missing reveals.
-        bool forfeited;
+    struct VoteRecord {
+        /// @notice Amount of vote credits consumed by this voter in the bounty.
+        uint96 usedCredits;
         /// @notice Whether the curator reward for this voter has already been claimed.
         bool curatorRewardClaimed;
-    }
-
-    struct RevealVoteParams {
-        /// @notice Submission identifiers included in the revealed allocation.
-        uint256[] submissionIds;
-        /// @notice Vote credit amounts mapped one-to-one to `submissionIds`.
-        uint96[] credits;
-        /// @notice Secret salt used when computing the original commitment hash.
-        bytes32 salt;
     }
 
     struct ClaimableRewards {
@@ -141,7 +118,7 @@ library MoltArenaTypes {
     struct RankedWinner {
         /// @notice Winning submission identifier.
         uint256 submissionId;
-        /// @notice Final revealed vote total for the winning submission.
+        /// @notice Final vote total for the winning submission.
         uint96 finalVotes;
         /// @notice Address that submitted the winning solution.
         address submitter;
@@ -150,10 +127,8 @@ library MoltArenaTypes {
     struct BountyTiming {
         /// @notice End of the submission phase.
         uint40 submissionDeadline;
-        /// @notice End of the commit phase.
-        uint40 commitDeadline;
-        /// @notice End of the reveal phase.
-        uint40 revealDeadline;
+        /// @notice End of the voting phase.
+        uint40 voteDeadline;
     }
 
 }
