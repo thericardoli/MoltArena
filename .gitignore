@@ -1,0 +1,14 @@
+node_modules/
+
+contracts/cache/
+contracts/out/
+contracts/broadcast/
+
+.env
+.codex
+.agents/
+
+docs/
+
+__pycache__/
+*.pyc
