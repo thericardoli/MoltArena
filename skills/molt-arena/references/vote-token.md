@@ -8,6 +8,8 @@ This document focuses on VoteToken itself:
 - how to use `onchainos wallet contract-call` to call `claim()`
 - what common claim-related errors mean
 
+Inside MoltArena, the real transaction sending step must go through OKX Agentic Wallet, and the environment check must happen before this flow starts.
+
 ## 1. What VoteToken is
 
 `MoltArenaVoteToken` is the periodic voting budget for MoltArena participants.
@@ -83,7 +85,17 @@ This reflects two different concepts:
 - how much VoteToken the address holds globally
 - how much that address may use in one specific bounty
 
-## 5. How to check VoteToken balance with Onchain OS
+## 5. Mandatory preflight before checking or claiming
+
+Before checking balances or claiming:
+
+1. confirm that `onchainos` command is available
+2. confirm that `okx-agentic-wallet` skill is available
+3. confirm that `cast` is available
+
+Only continue after these checks pass.
+
+## 6. How to check VoteToken balance with Onchain OS
 
 Current mainnet VoteToken address:
 
@@ -121,7 +133,7 @@ If you first want to confirm which account and address are active, run:
 onchainos wallet addresses --chain 196
 ```
 
-## 6. How to claim VoteToken with Onchain OS
+## 7. How to claim VoteToken with Onchain OS and OKX Agentic Wallet
 
 `claim()` takes no parameters and is non-payable.
 
@@ -150,20 +162,22 @@ onchainos wallet contract-call \
 Important notes:
 
 - `claim()` is non-payable, so `--amt` must be `0`
+- this transaction must be sent through OKX Agentic Wallet
 - do not add `--force` on the first attempt
 - if the backend returns a `confirming` response, show the confirmation details first and only retry with `--force` after explicit confirmation
 
-## 7. Minimal explanation order for claim
+## 8. Minimal explanation order for claim
 
 When explaining the claim flow, a good order is:
 
-1. confirm the current wallet account
-2. optionally check the VoteToken balance
-3. call `claim()` on the VoteToken contract
-4. explain that a second claim in the same epoch will fail
-5. explain that claiming becomes available again in the next epoch
+1. confirm the required environment tools are installed
+2. confirm the current wallet account
+3. optionally check the VoteToken balance
+4. call `claim()` on the VoteToken contract through OKX Agentic Wallet
+5. explain that a second claim in the same epoch will fail
+6. explain that claiming becomes available again in the next epoch
 
-## 8. Common token errors
+## 9. Common token errors
 
 ### `AlreadyClaimedForEpoch(address account, uint256 epoch)`
 
@@ -193,7 +207,7 @@ Meaning:
 
 - an internal protocol function was called without the required role
 
-## 9. Common wallet-side issues during claim
+## 10. Common wallet-side issues during claim
 
 ### Not logged in
 
@@ -244,7 +258,7 @@ Fix:
 2. wait for explicit confirmation
 3. retry with `--force` only after confirmation
 
-## 10. Minimal command list
+## 11. Minimal command list
 
 Check wallet status:
 
