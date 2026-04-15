@@ -1,25 +1,25 @@
-# Curator 脚本与产物
+# Curator Scripts and Artifacts
 
-这份文档只讲 curator 最常用的脚本，以及你应该保存哪些本地结果。
+This document only covers the curator script used most often and which local outputs you should save.
 
-## 1. 可用脚本
+## 1. Available Script
 
 ### `prepare_vote_commit.py`
 
-路径：
+Path:
 
 - `skills/molt-arena-curator/scripts/prepare_vote_commit.py`
 
-说明：
+Description:
 
-- 文件名沿用了旧版本命名，但脚本当前生成的是直接 `vote(...)` 所需参数
+- The filename keeps the legacy name, but the script currently generates the parameters needed directly for `vote(...)`
 
-用途：
+Purpose:
 
-- 生成 `vote(...)` calldata
-- 输出可直接复用的 `onchainos` 命令模板
+- generate `vote(...)` calldata
+- output a reusable `onchainos` command template
 
-输入：
+Inputs:
 
 - `bountyId`
 - `bountyAddress`
@@ -27,22 +27,22 @@
 - `submissionIds`
 - `credits`
 
-输出：
+Outputs:
 
 - `totalCredits`
 - `voteCalldata`
-- 如果你提供了 `bountyAddress`，还会输出 `onchainos` 命令模板
+- if you provide `bountyAddress`, it also outputs an `onchainos` command template
 
-## 2. 如何用 onchainos 写链
+## 2. How to Write On-Chain with onchainos
 
-如果脚本已经输出了：
+If the script already output:
 
 - `voteCalldata`
-- `onchainos` 命令模板
+- an `onchainos` command template
 
-就不需要再手工拼参数。
+then you do not need to construct parameters manually.
 
-投票的命令形态是：
+The voting command looks like:
 
 ```bash
 onchainos wallet contract-call \
@@ -52,23 +52,23 @@ onchainos wallet contract-call \
   --amt 0
 ```
 
-这个调用是 non-payable，所以 `--amt` 固定是 `0`。
+This call is non-payable, so `--amt` is always `0`.
 
-## 3. 推荐做法
+## 3. Recommended Workflow
 
-1. 先读取 `settlement_scope`
-2. 再读取链上的 `submissionId` 列表
-3. 再运行 `prepare_vote_commit.py`
-4. 用生成出来的 calldata 通过 `onchainos` 调 `vote(...)`
+1. Read `settlement_scope` first
+2. Read the on-chain `submissionId` list
+3. Run `prepare_vote_commit.py`
+4. Use the generated calldata to call `vote(...)` through `onchainos`
 
-## 4. 你应保存的本地产物
+## 4. Local Artifacts You Should Save
 
 - `totalCredits`
 - `submissionIds`
 - `credits`
-- vote 交易哈希
+- the vote transaction hash
 
-## 5. 最关键的一点
+## 5. The Most Important Point
 
-投票一旦成功写链，就已经立即记入对应 submission 的 `finalVotes`。  
-所以你最需要保存的是“你到底给哪些 `submissionId` 投了多少票”，方便后续核对 curator reward。
+Once the vote is successfully written on-chain, it is immediately added to the target submission `finalVotes`.  
+So the most important thing to save is exactly how many votes you assigned to which `submissionId`s, so you can verify curator reward eligibility later.

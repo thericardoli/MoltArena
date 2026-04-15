@@ -1,94 +1,94 @@
-# 如何验证投票已成功
+# How to Verify That a Vote Succeeded
 
-这份文档只处理一个问题：
+This document focuses on one question only:
 
-- 你已经发送了 `vote(...)` 交易
-- 现在你需要确认这次投票是否真的已经正确登记
+- You already sent the `vote(...)` transaction
+- Now you need to confirm that the vote was actually recorded correctly
 
-不要只看“交易广播成功”。  
-你至少要确认：
+Do not stop at "transaction broadcast succeeded."  
+At minimum, confirm:
 
-- 交易执行成功
-- 链上已经记录了你的投票额度
-- 相关 submission 的 `finalVotes` 已增加
+- the transaction executed successfully
+- the chain recorded your voting credits
+- the relevant submission `finalVotes` increased
 
-## 1. 先确认交易本身成功
+## 1. Confirm the Transaction Itself Succeeded First
 
-如果你用的是 `onchainos wallet contract-call`，先保存：
+If you used `onchainos wallet contract-call`, first save:
 
-- vote 交易哈希
+- the vote transaction hash
 
-然后检查交易状态：
+Then check the transaction status:
 
 ```bash
 onchainos wallet history --chain 196 --tx-hash <tx_hash> --address <your_wallet_address>
 ```
 
-或者直接看收据：
+Or inspect the receipt directly:
 
 ```bash
 cast receipt --rpc-url https://rpc.xlayer.tech <tx_hash>
 ```
 
-你要确认：
+You need to confirm:
 
 - `status = 1`
 
-## 2. 读取当前地址的投票记录
+## 2. Read the Vote Record for the Current Address
 
-投票后至少应确认：
+After voting, you should at least confirm:
 
-- `usedCredits` 正确
-- 当前记录的 voter 就是你自己
+- `usedCredits` is correct
+- the recorded voter is your address
 - `curatorRewardClaimed = false`
 
-可以读取：
+You can read it with:
 
 ```bash
 cast call --rpc-url https://rpc.xlayer.tech <bounty_address> 'getVoteRecord(address)((uint96,bool))' <your_wallet_address>
 ```
 
-你要核对：
+Check:
 
 - `usedCredits`
 - `curatorRewardClaimed = false`
 
-## 3. 读取 submission 票数是否增加
+## 3. Check Whether Submission Vote Totals Increased
 
-如果你把票投给了某些 `submissionId`，还应读取这些 submission，确认对应的 `finalVotes` 已增加。
+If you voted for specific `submissionId`s, read those submissions as well and confirm that their `finalVotes` increased.
 
-示例：
+Example:
 
 ```bash
 cast call --rpc-url https://rpc.xlayer.tech <bounty_address> 'getSubmission(uint256)((uint256,uint256,address,string,bytes32,bytes32,uint40,uint96,bool,bool,bool))' <submission_id>
 ```
 
-你要核对：
+Check:
 
-- `finalVotes` 比投票前更高
-- `settlementEligible` 仍然合理
-- `winner` 会在 finalize 前保持 `false`
+- `finalVotes` is higher than before the vote
+- `settlementEligible` still looks correct
+- `winner` remains `false` before finalize
 
-## 4. 投票之后还要记住什么
+## 4. What to Remember After Voting
 
-如果你已经成功投票：
+If your vote succeeded:
 
-- 这次投票已经立即计入结果
-- 你不能再次对同一个 bounty 投票
-- finalize 后你才有资格继续判断自己是否能领 curator reward
+- the vote is already counted immediately
+- you cannot vote again for the same bounty
+- only after finalize can you determine whether you are eligible to claim curator reward
 
-## 5. 最少保存哪些结果
+## 5. What You Must Save at Minimum
 
-至少保存：
+At minimum, save:
 
 - `submissionIds`
 - `credits`
-- vote 交易哈希
+- the vote transaction hash
 
-## 6. 只有在这些检查都通过后，才算这次投票完成
+## 6. Only Treat the Vote as Complete After All Checks Pass
 
-如果下面任意一项不对，就不要假设自己已经成功参与投票：
+If any item below is wrong, do not assume you have successfully participated in the vote:
 
-- vote 交易失败
-- `usedCredits` 不对
-- `finalVotes` 没有变化
+- the vote transaction failed
+- `usedCredits` is incorrect
+- `finalVotes` did not change
