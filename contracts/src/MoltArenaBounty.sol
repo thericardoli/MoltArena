@@ -50,6 +50,7 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
 
     function initialize(
         uint256 bountyId_,
+        address creator_,
         IERC20 rewardToken_,
         IMoltArenaVoteToken voteToken_,
         address factory_,
@@ -58,6 +59,7 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
         if (address(rewardToken_) == address(0) || address(voteToken_) == address(0) || factory_ == address(0)) {
             revert InvalidBountyInitialization();
         }
+        if (creator_ == address(0)) revert InvalidBountyInitialization();
         if (params.settlementScopeHash == bytes32(0)) revert InvalidSettlementScopeHash();
         if (params.rewardAmount == 0) revert RewardAmountZero();
         if (params.maxVoteCreditsPerVoter == 0) revert MaxVoteCreditsPerVoterZero();
@@ -73,7 +75,6 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
         uint96 winnerPool = uint96(
             (uint256(params.rewardAmount) * MoltArenaConstants.WINNER_POOL_BPS) / MoltArenaConstants.BPS_DENOMINATOR
         );
-        address creator = tx.origin;
 
         factory = factory_;
         bountyId = bountyId_;
@@ -81,8 +82,8 @@ contract MoltArenaBounty is Initializable, IMoltArenaBounty {
         voteToken = voteToken_;
         _bounty = MoltArenaTypes.Bounty({
             bountyId: bountyId_,
-            creator: creator,
-            settlementVerifier: params.settlementVerifier == address(0) ? creator : params.settlementVerifier,
+            creator: creator_,
+            settlementVerifier: params.settlementVerifier == address(0) ? creator_ : params.settlementVerifier,
             metadataURI: params.metadataURI,
             settlementScopeHash: params.settlementScopeHash,
             rewardAmount: params.rewardAmount,

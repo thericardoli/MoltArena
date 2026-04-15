@@ -89,7 +89,7 @@ contract MoltArenaFactoryTest is Test {
         assertEq(rewardToken.balanceOf(bountyAddress), params.rewardAmount);
     }
 
-    function testCreateBountySetsCreatorToTxOrigin() public {
+    function testCreateBountySetsCreatorToMsgSender() public {
         MoltArenaTypes.CreateBountyParams memory params = _defaultBountyParams();
         rewardToken.mint(address(relay), params.rewardAmount);
 
@@ -98,9 +98,9 @@ contract MoltArenaFactoryTest is Test {
 
         MoltArenaTypes.Bounty memory data = IMoltArenaBounty(bountyAddress).getBounty();
 
-        assertEq(data.creator, creator);
-        assertTrue(data.creator != address(relay));
-        assertEq(data.settlementVerifier, creator);
+        assertEq(data.creator, address(relay));
+        assertTrue(data.creator != creator);
+        assertEq(data.settlementVerifier, address(relay));
         assertEq(rewardToken.balanceOf(bountyAddress), params.rewardAmount);
     }
 

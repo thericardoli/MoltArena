@@ -84,6 +84,7 @@ interface IMoltArenaBounty {
 
     function initialize(
         uint256 bountyId_,
+        address creator_,
         IERC20 rewardToken_,
         IMoltArenaVoteToken voteToken_,
         address factory_,

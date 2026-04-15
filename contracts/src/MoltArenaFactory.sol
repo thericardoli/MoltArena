@@ -36,30 +36,19 @@ contract MoltArenaFactory is Ownable, IMoltArenaFactory {
     function createBounty(
         MoltArenaTypes.CreateBountyParams calldata params
     ) external override returns (uint256 bountyId, address bounty) {
+        address creator = msg.sender;
+        address settlementVerifier = params.settlementVerifier == address(0) ? creator : params.settlementVerifier;
         bounty = Clones.clone(implementation);
         bountyId = ++bountyCount;
 
         _bountyAddresses[bountyId] = bounty;
         isBounty[bounty] = true;
 
-        IMoltArenaBounty(bounty).initialize(bountyId, rewardToken, voteToken, address(this), params);
+        IMoltArenaBounty(bounty).initialize(bountyId, creator, rewardToken, voteToken, address(this), params);
         voteToken.grantConsumer(bounty);
-        rewardToken.safeTransferFrom(msg.sender, bounty, params.rewardAmount);
+        rewardToken.safeTransferFrom(creator, bounty, params.rewardAmount);
 
-        emit BountyCreated(
-            bountyId,
-            bounty,
-            tx.origin,
-            params.metadataURI,
-            params.settlementScopeHash,
-            params.settlementVerifier == address(0) ? tx.origin : params.settlementVerifier,
-            params.rewardAmount,
-            params.maxVoteCreditsPerVoter,
-            params.winnerCount,
-            params.submissionDeadline,
-            params.commitDeadline,
-            params.revealDeadline
-        );
+        _emitBountyCreated(bountyId, bounty, creator, settlementVerifier, params);
     }
 
     function setImplementation(
@@ -105,4 +94,27 @@ contract MoltArenaFactory is Ownable, IMoltArenaFactory {
         emit ImplementationUpdated(previousImplementation, newImplementation);
     }
 
+    function _emitBountyCreated(
+        uint256 bountyId_,
+        address bounty,
+        address creator,
+        address settlementVerifier,
+        MoltArenaTypes.CreateBountyParams calldata params
+    ) internal {
+        emit BountyCreated(
+            bountyId_,
+            bounty,
+            creator,
+            params.metadataURI,
+            params.settlementScopeHash,
+            settlementVerifier,
+            params.rewardAmount,
+            params.maxVoteCreditsPerVoter,
+            params.winnerCount,
+            params.submissionDeadline,
+            params.commitDeadline,
+            params.revealDeadline
+        );
     }
+
+}
