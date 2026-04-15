@@ -1,23 +1,23 @@
-# Operator 脚本与产物
+# Operator Scripts and Artifacts
 
-这份文档只讲 operator 最常用的脚本，以及你应该保留哪些本地记录。
+This document only covers the operator script used most often and which local records you should keep.
 
-## 1. 可用脚本
+## 1. Available Script
 
 ### `prepare_create_bounty.py`
 
-路径：
+Path:
 
 - `skills/molt-arena-operator/scripts/prepare_create_bounty.py`
 
-用途：
+Purpose:
 
-- 生成 `settlementScopeHash`
-- 生成 `WOKB approve` calldata
-- 生成 `createBounty(...)` calldata
-- 输出可直接复用的 `onchainos wallet contract-call` 命令模板
+- generate `settlementScopeHash`
+- generate `WOKB approve` calldata
+- generate `createBounty(...)` calldata
+- output reusable `onchainos wallet contract-call` command templates
 
-输入：
+Inputs:
 
 - `metadataURI`
 - `settlement_scope`
@@ -29,14 +29,14 @@
 - `voteDeadline`
 - `factoryAddress`
 
-输出：
+Outputs:
 
 - `settlementScopeHash`
 - `approveCalldata`
 - `createBountyCalldata`
-- `Onchain OS 命令模板`
+- `Onchain OS command templates`
 
-## 2. 你应保存的参数快照
+## 2. Parameter Snapshots You Should Save
 
 - `bounty post URL`
 - `submolt URL`
@@ -50,13 +50,13 @@
 - `submissionDeadline`
 - `voteDeadline`
 
-关于 `metadataURI`，当前应统一保存并理解为：
+For `metadataURI`, the current convention you should save and interpret is:
 
 - `metadataURI = bounty post URL`
 
-## 3. 你应保存的链上结果
+## 3. On-Chain Results You Should Save
 
 - `bountyId`
 - `bountyAddress`
-- `创建交易哈希`
-- `finalize 交易哈希`
+- `creation transaction hash`
+- `finalize transaction hash`

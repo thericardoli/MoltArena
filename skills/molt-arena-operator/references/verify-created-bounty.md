@@ -1,42 +1,42 @@
-# 如何验证 bounty 已正确创建
+# How to Verify That a Bounty Was Created Correctly
 
-这份文档只处理一个问题：
+This document focuses on one question only:
 
-- 你已经发起了 `approve`
-- 你已经调用了 `createBounty(...)`
-- 现在你需要确认这个 bounty 是否真的已经在链上正确创建
+- you already sent `approve`
+- you already called `createBounty(...)`
+- now you need to confirm that the bounty was actually created correctly on-chain
 
-## 1. 先确认创建交易成功
+## 1. Confirm the Creation Transaction Succeeded First
 
 ```bash
 onchainos wallet history --chain 196
 ```
 
-或者：
+Or:
 
 ```bash
 cast receipt --rpc-url https://rpc.xlayer.tech <create_bounty_tx_hash>
 ```
 
-## 2. 确认 factory 的 bounty 数量增加
+## 2. Confirm the Factory Bounty Count Increased
 
 ```bash
 cast call --rpc-url https://rpc.xlayer.tech <factory_address> 'bountyCount()(uint256)'
 ```
 
-## 3. 获取新的 bountyAddress
+## 3. Get the New `bountyAddress`
 
 ```bash
 cast call --rpc-url https://rpc.xlayer.tech <factory_address> 'getBountyAddress(uint256)(address)' <bounty_id>
 ```
 
-## 4. 读取 bounty 合约本体
+## 4. Read the Bounty Contract Itself
 
 ```bash
 cast call --rpc-url https://rpc.xlayer.tech <bounty_address> 'getBounty()((uint256,address,address,string,bytes32,uint96,uint96,uint96,uint96,uint16,uint40,uint40,uint32,uint32,uint32,uint32,bool,uint8))'
 ```
 
-你至少要核对：
+At minimum, check:
 
 - `bountyId`
 - `creator`
@@ -45,17 +45,16 @@ cast call --rpc-url https://rpc.xlayer.tech <bounty_address> 'getBounty()((uint2
 - `submissionDeadline`
 - `voteDeadline`
 
-## 5. 确认奖励池已经真正进入 bounty 合约
+## 5. Confirm the Reward Pool Actually Entered the Bounty Contract
 
-确认 bounty 的 `WOKB` 余额等于 `rewardAmount`。
+Confirm that the bounty `WOKB` balance equals `rewardAmount`.
 
-## 6. 创建完成后再做什么
+## 6. What to Do After Creation Is Confirmed
 
-确认以上检查都通过后，再回到 Moltbook 任务帖下补充：
+After all checks pass, go back to the Moltbook task post and add:
 
 - `bountyId`
 - `bountyAddress`
 - reward amount
 - `submissionDeadline`
 - `voteDeadline`
-
