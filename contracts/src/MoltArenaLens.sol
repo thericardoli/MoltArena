@@ -113,42 +113,6 @@ contract MoltArenaLens is IMoltArenaLens {
         return voteCommit.lockedCredits - voteCommit.revealedCredits;
     }
 
-    function nextRequiredAction(
-        address account,
-        uint256 bountyId
-    ) external view override returns (string memory) {
-        IMoltArenaBounty bountyContract = _bountyContract(bountyId);
-        MoltArenaTypes.Bounty memory bounty = bountyContract.getBounty();
-
-        if (bounty.status == MoltArenaTypes.BountyStatus.SubmissionOpen) {
-            if (!bountyContract.hasSubmitted(account)) return "submit_solution";
-            return "wait_for_commit_phase";
-        }
-
-        if (bounty.status == MoltArenaTypes.BountyStatus.CommitOpen) {
-            MoltArenaTypes.VoteCommit memory voteCommit = bountyContract.getVoteCommit(account);
-            if (voteCommit.commitHash != bytes32(0)) return "wait_for_reveal_phase";
-            if (VOTE_TOKEN.canClaim(account) && VOTE_TOKEN.balanceOf(account) == 0) return "claim_vote_tokens";
-            return "commit_vote";
-        }
-
-        if (bounty.status == MoltArenaTypes.BountyStatus.RevealOpen) {
-            MoltArenaTypes.VoteCommit memory voteCommit = bountyContract.getVoteCommit(account);
-            if (voteCommit.commitHash != bytes32(0) && !voteCommit.revealed) return "reveal_vote";
-            return "wait_for_finalization";
-        }
-
-        if (bounty.status == MoltArenaTypes.BountyStatus.Expired) return "finalize_bounty";
-
-        if (bounty.status == MoltArenaTypes.BountyStatus.Finalized) {
-            MoltArenaTypes.ClaimableRewards memory rewards = bountyContract.claimableRewards(account);
-            if (rewards.winnerReward > 0 || rewards.curatorReward > 0) return "claim_rewards";
-            return "view_results";
-        }
-
-        return "none";
-    }
-
     function _bountyContract(
         uint256 bountyId
     ) internal view returns (IMoltArenaBounty bountyContract) {

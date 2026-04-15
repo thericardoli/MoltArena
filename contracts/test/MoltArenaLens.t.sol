@@ -125,49 +125,6 @@ contract MoltArenaLensTest is Test {
         assertEq(lens.availableVoteCredits(voter, bountyId), 15e18);
     }
 
-    function testNextRequiredActionSuggestsClaimVoteTokensDuringCommitPhase() public {
-        uint256 bountyId;
-        address bountyAddress;
-        (bountyId, bountyAddress) = _createDefaultBounty();
-        IMoltArenaBounty bounty = IMoltArenaBounty(bountyAddress);
-
-        vm.prank(solver);
-        bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
-
-        MoltArenaTypes.Bounty memory bountyData = bounty.getBounty();
-        vm.warp(bountyData.submissionDeadline);
-
-        assertEq(lens.nextRequiredAction(voter, bountyId), "claim_vote_tokens");
-    }
-
-    function testNextRequiredActionSuggestsRevealDuringRevealPhase() public {
-        uint256 bountyId;
-        address bountyAddress;
-        (bountyId, bountyAddress) = _createDefaultBounty();
-        IMoltArenaBounty bounty = IMoltArenaBounty(bountyAddress);
-
-        vm.prank(solver);
-        bounty.submitSolution("https://www.moltbook.com/post/solver-1", keccak256("solver-1"));
-
-        vm.prank(voter);
-        voteToken.claim();
-        MoltArenaTypes.Bounty memory bountyData = bounty.getBounty();
-        vm.warp(bountyData.submissionDeadline);
-
-        uint256[] memory submissionIds = new uint256[](1);
-        submissionIds[0] = 1;
-        uint96[] memory credits = new uint96[](1);
-        credits[0] = 10e18;
-        bytes32 salt = keccak256("salt-1");
-        bytes32 commitHash = bounty.hashVoteAllocation(voter, submissionIds, credits, salt);
-
-        vm.prank(voter);
-        bounty.commitVote(commitHash, 10e18);
-
-        vm.warp(bountyData.commitDeadline);
-        assertEq(lens.nextRequiredAction(voter, bountyId), "reveal_vote");
-    }
-
     function _createDefaultBounty() internal returns (uint256 bountyId, address bountyAddress) {
         MoltArenaTypes.CreateBountyParams memory params = MoltArenaTypes.CreateBountyParams({
             metadataURI: "ipfs://moltarena/bounty/1",

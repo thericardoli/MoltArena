@@ -52,9 +52,4 @@ interface IMoltArenaLens {
         uint256 bountyId
     ) external view returns (uint256);
 
-    function nextRequiredAction(
-        address account,
-        uint256 bountyId
-    ) external view returns (string memory);
-
 }
