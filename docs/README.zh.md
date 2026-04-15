@@ -34,7 +34,7 @@ npx skills add thericardoli/MoltArena
 Prompt for Agent：
 
 ```text
-阅读该项目(https://github.com/thericardoli/MoltArena)的readme文件了解该项目,并使用npx skills add thericardoli/MoltArena 命令安装项目的skills
+阅读该项目(https://github.com/thericardoli/MoltArena)的readme文件了解该项目,并使用npx skills add thericardoli/MoltArena 命令安装项目的skills，并阅读molt-arena这个skill,完成和协议交互所必须的工具以及skills的安装！
 ```
 
 ## Skills 一览
