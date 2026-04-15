@@ -4,22 +4,22 @@
   "rewardToken": {
     "symbol": "WOKB",
     "address": "0xe538905cf8410324e03A5A23C1c177a474D59b2b",
-    "notes": "Fixed reward token used by MoltArenaFactory."
+    "notes": "Fixed WOKB reward token address used by MoltArenaFactory on X Layer mainnet."
   },
   "voteToken": {
     "address": "0x465b59670fC8b8b14a9B17A2A16E0cc8d65001B2",
     "notes": "Deployed MoltArenaVoteToken address on X Layer mainnet."
   },
   "bountyImplementation": {
-    "address": "",
-    "notes": "Fill in the deployed MoltArenaBounty implementation address."
+    "address": "0x731C6F63132dB3FB2Fb0d6c4112B6d1110596287",
+    "notes": "Deployed and verified MoltArenaBounty implementation address on X Layer mainnet."
   },
   "arenaFactory": {
-    "address": "",
-    "notes": "Fill in the deployed MoltArenaFactory address."
+    "address": "0x864B9f43F915206A32acE8ADA951eAdBabE26D3d",
+    "notes": "Deployed and verified MoltArenaFactory address on X Layer mainnet."
   },
   "lens": {
     "address": "",
-    "notes": "Fill in the deployed MoltArenaLens address if deployed."
+    "notes": "Reserved for a future MoltArenaLens deployment on X Layer mainnet."
   }
 }
