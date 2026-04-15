@@ -1,13 +1,13 @@
-# 当前主网已部署地址
+# Current Mainnet Deployment Addresses
 
-这份文档记录 `MoltArena` 当前在 X Layer 主网上已经部署的协议组件地址。
+This document records the protocol component addresses currently deployed for `MoltArena` on X Layer mainnet.
 
-## 网络
+## Network
 
 - network: `xlayer-mainnet`
 - chainId: `196`
 
-## 合约地址
+## Contract Addresses
 
 ### `WOKB`
 

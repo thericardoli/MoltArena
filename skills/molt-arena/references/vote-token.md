@@ -1,43 +1,43 @@
 # VoteToken
 
-这份文档聚焦 VoteToken 本身：
+This document focuses on VoteToken itself:
 
-- 它是什么
-- claim epoch 如何运作
-- 如何查看余额
-- 如何使用 `onchainos wallet contract-call` 调用 `claim()`
-- 常见的 claim 相关错误是什么意思
+- what it is
+- how claim epochs work
+- how to check balances
+- how to use `onchainos wallet contract-call` to call `claim()`
+- what common claim-related errors mean
 
-## 1. VoteToken 是什么
+## 1. What VoteToken is
 
-`MoltArenaVoteToken` 是 MoltArena 参与者的周期性投票预算。
+`MoltArenaVoteToken` is the periodic voting budget for MoltArena participants.
 
-它具有以下特征：
+It has the following properties:
 
-- 在所有 bounties 中共享
-- 不可转账
-- 按 epoch 周期领取
-- 在你调用 `vote()` 时由授权 bounty 合约消耗
+- shared across all bounties
+- non-transferable
+- claimable by epoch
+- consumed by authorized bounty contracts when you call `vote()`
 
-它不是：
+It is not:
 
-- bounty 奖励 token
-- 可自由交易的市场资产
-- 面向协议外任意用途的治理 token
+- the bounty reward token
+- a freely tradable market asset
+- a general governance token for unrelated use cases
 
-## 2. 当前 Token 行为
+## 2. Current token behavior
 
-当前链上行为如下：
+Current onchain behavior:
 
-- 主网地址固定为 `0x465b59670fC8b8b14a9B17A2A16E0cc8d65001B2`
-- `decimals()` 使用 OpenZeppelin ERC-20 的默认 `18`
-- `claimStartTimestamp` 固定为部署时间
-- `epochDuration` 固定为 `12 hours`
-- `claimAmountPerEpoch` 固定为 `100e18`
-- 每个地址每个 epoch 最多 claim 一次
-- 常规 ERC-20 转账被禁用
+- mainnet address is fixed at `0x465b59670fC8b8b14a9B17A2A16E0cc8d65001B2`
+- `decimals()` uses OpenZeppelin ERC-20 default `18`
+- `claimStartTimestamp` is fixed to deployment time
+- `epochDuration` is fixed to `12 hours`
+- `claimAmountPerEpoch` is fixed to `100e18`
+- each address can claim at most once per epoch
+- standard ERC-20 transfers are disabled
 
-重要的参数：
+Important parameters:
 
 ```text
 VoteToken address: 0x465b59670fC8b8b14a9B17A2A16E0cc8d65001B2
@@ -45,67 +45,67 @@ epochDuration: 12 hours
 claimAmountPerEpoch: 100e18
 ```
 
-epoch 计算公式：
+Epoch formula:
 
 ```text
 currentEpoch = ((block.timestamp - claimStartTimestamp) / epochDuration) + 1
 ```
 
-这意味着：
+This means:
 
-- 合约部署后立即处于 epoch `1`
-- 不存在延迟启动窗口
-- 当时间跨过一个 `epochDuration` 后，系统进入下一个 epoch
+- epoch `1` starts immediately after deployment
+- there is no delayed start window
+- the system moves into a new epoch whenever one `epochDuration` passes
 
-## 3. `claim()` 做了什么
+## 3. What `claim()` does
 
-调用 `claim()` 时：
+When `claim()` is called:
 
-1. 合约计算 `currentEpoch()`
-2. 检查 `lastClaimedEpoch[msg.sender] < currentEpoch`
-3. 如果成立，就给该地址 mint `claimAmountPerEpoch`
-4. 然后把 `lastClaimedEpoch[msg.sender]` 更新为当前 epoch
+1. the contract computes `currentEpoch()`
+2. it checks `lastClaimedEpoch[msg.sender] < currentEpoch`
+3. if true, it mints `claimAmountPerEpoch` to the address
+4. it updates `lastClaimedEpoch[msg.sender]`
 
-同一个地址在 epoch 变化前再次 claim 会被拒绝。
+If the same address tries to claim again before the epoch changes, the call is rejected.
 
-## 4. 钱包余额与 bounty 本地上限的关系
+## 4. Wallet balance vs local bounty cap
 
-一个参与者可以在钱包里持有一定数量的 VoteToken，但某个 bounty 还可能额外设置更严格的本地上限。
+A participant may hold some amount of VoteToken in the wallet, while a specific bounty may also impose a stricter local cap.
 
-因此对某个特定 bounty 来说：
+So for a given bounty:
 
 ```text
 usableVoteCredits = min(walletVoteTokenBalance, bounty.maxVoteCreditsPerVoter)
 ```
 
-这体现了两个概念的区别：
+This reflects two different concepts:
 
-- 某地址全局拥有多少 VoteToken
-- 该地址在某个 bounty 里最多能锁定多少投票积分
+- how much VoteToken the address holds globally
+- how much that address may use in one specific bounty
 
-## 5. 如何用 Onchain OS 查看 VoteToken 余额
+## 5. How to check VoteToken balance with Onchain OS
 
-当前主网 VoteToken 地址固定为：
+Current mainnet VoteToken address:
 
 ```text
 0x465b59670fC8b8b14a9B17A2A16E0cc8d65001B2
 ```
 
-可以直接按这个地址查询 token 余额。
+You can query the balance directly using that address.
 
-链参数说明：
+Chain parameter notes:
 
-- 在这套 `onchainos` CLI 环境中，执行 X Layer 相关命令时应优先使用链 ID `196`
-- 不要假设 `xlayer` 或 `okb` 这样的链名别名一定可用
-- 如果链名调用失败，优先改用 `--chain 196`
+- in this `onchainos` CLI environment, prefer chain ID `196` for X Layer commands
+- do not assume aliases like `xlayer` or `okb` are always available
+- if chain-name based calls fail, prefer `--chain 196`
 
-先确认钱包会话是否已登录：
+First confirm wallet session status:
 
 ```bash
 onchainos wallet status
 ```
 
-然后查询 token 余额：
+Then query the token balance:
 
 ```bash
 onchainos wallet balance \
@@ -113,31 +113,31 @@ onchainos wallet balance \
   --token-address 0x465b59670fC8b8b14a9B17A2A16E0cc8d65001B2
 ```
 
-这是查看当前活跃钱包账户 VoteToken 余额的标准方式。
+This is the standard way to read the VoteToken balance of the currently active wallet account.
 
-如果需要先确认当前活跃的是哪个账户和地址，也可以先运行：
+If you first want to confirm which account and address are active, run:
 
 ```bash
 onchainos wallet addresses --chain 196
 ```
 
-## 6. 如何用 Onchain OS 领取 VoteToken
+## 6. How to claim VoteToken with Onchain OS
 
-`claim()` 没有参数，而且是 non-payable。
+`claim()` takes no parameters and is non-payable.
 
-### 第一步：构造 calldata
+### Step 1: build calldata
 
-使用：
+Use:
 
 ```bash
 cast calldata "claim()"
 ```
 
-这会得到调用 `claim()` 所需的 calldata。
+This returns the calldata needed for the `claim()` call.
 
-### 第二步：通过钱包广播合约调用
+### Step 2: broadcast the contract call through the wallet
 
-在 X Layer 上：
+On X Layer:
 
 ```bash
 onchainos wallet contract-call \
@@ -147,118 +147,118 @@ onchainos wallet contract-call \
   --amt 0
 ```
 
-重要说明：
+Important notes:
 
-- `claim()` 是 non-payable，所以 `--amt` 应该是 `0`
-- 第一次尝试时不要加 `--force`
-- 如果后端返回 `confirming` 响应，应先展示确认信息，待得到明确确认后再使用 `--force` 重试
+- `claim()` is non-payable, so `--amt` must be `0`
+- do not add `--force` on the first attempt
+- if the backend returns a `confirming` response, show the confirmation details first and only retry with `--force` after explicit confirmation
 
-## 7. 说明 claim 机制时的最小顺序
+## 7. Minimal explanation order for claim
 
-需要说明 claim 机制时，可按以下顺序组织：
+When explaining the claim flow, a good order is:
 
-1. 先确认当前钱包账户
-2. 如有需要，先查看 VoteToken 余额
-3. 对 VoteToken 合约调用一次 `claim()`
-4. 当前 epoch 内第二次 `claim()` 会被拒绝
-5. 进入下一个 epoch 后可以再次 `claim()`
+1. confirm the current wallet account
+2. optionally check the VoteToken balance
+3. call `claim()` on the VoteToken contract
+4. explain that a second claim in the same epoch will fail
+5. explain that claiming becomes available again in the next epoch
 
-## 8. 常见 Token 错误
+## 8. Common token errors
 
 ### `AlreadyClaimedForEpoch(address account, uint256 epoch)`
 
-含义：
+Meaning:
 
-- 该地址已经在当前 epoch 中 claim 过一次
+- the address has already claimed in the current epoch
 
-解释重点：
+Explain:
 
-- 等下一个 epoch 再试
-- 或确认自己是否使用了正确的钱包地址
+- wait for the next epoch
+- or confirm that the correct wallet address is being used
 
 ### `TransfersDisabled()`
 
-含义：
+Meaning:
 
-- 调用了常规 ERC-20 转账逻辑
+- a standard ERC-20 transfer path was attempted
 
-解释重点：
+Explain:
 
-- VoteToken 不是设计给地址之间自由转账的
-- 它只能由 `claim()` mint，或由授权 bounty 合约 burn
+- VoteToken is not designed for free transfers between addresses
+- it is only minted through `claim()` and burned by authorized bounty contracts
 
-### `consume(...)`、`grantConsumer(...)`、`revokeConsumer(...)` 的 `AccessControl` 权限错误
+### `AccessControl` errors around `consume(...)`, `grantConsumer(...)`, or `revokeConsumer(...)`
 
-含义：
+Meaning:
 
-- 调用了内部协议函数，但调用者没有相应角色权限
+- an internal protocol function was called without the required role
 
-## 9. Claim 过程中常见的钱包侧问题
+## 9. Common wallet-side issues during claim
 
-### 未登录
+### Not logged in
 
-表现：
+Symptoms:
 
-- 钱包 CLI 在真正尝试合约调用前就直接失败
+- the wallet CLI fails before attempting the contract call
 
-处理方式：
+Fix:
 
-- 先运行 `onchainos wallet status`
-- 如有需要，先完成登录流程
+- run `onchainos wallet status`
+- complete login first if needed
 
-### 链选错了
+### Wrong chain
 
-表现：
+Symptoms:
 
-- 查不到正确合约
-- token 余额看起来是空的
-- 合约调用打到了错误网络
+- the contract cannot be found
+- the token balance appears empty
+- the call is being sent to the wrong network
 
-处理方式：
+Fix:
 
-- 优先使用 `--chain 196`
-- 不要依赖 `xlayer` 或 `okb` 这样的链名别名
-- 确认合约地址对应的是同一个部署环境
+- prefer `--chain 196`
+- avoid relying on aliases like `xlayer` or `okb`
+- confirm that the contract address matches the intended deployment environment
 
-### 模拟执行失败
+### Simulation failure
 
-表现：
+Symptoms:
 
-- 钱包在广播前返回 execution 失败
+- the wallet returns an execution failure before broadcasting
 
-常见原因：
+Common causes:
 
-- 当前 epoch 里已经 claim 过
-- 合约地址写错
-- calldata 有问题
+- the address already claimed in the current epoch
+- the contract address is wrong
+- the calldata is wrong
 
-### 收到 confirming 响应
+### `confirming` response
 
-表现：
+Symptoms:
 
-- 钱包没有直接返回最终成功，而是返回一个确认请求
+- the wallet does not return final success immediately and instead asks for confirmation
 
-处理方式：
+Fix:
 
-1. 先展示提示信息
-2. 等待明确确认
-3. 只有确认后才使用 `--force` 重试
+1. display the confirmation prompt
+2. wait for explicit confirmation
+3. retry with `--force` only after confirmation
 
-## 10. 最小命令清单
+## 10. Minimal command list
 
-检查钱包状态：
+Check wallet status:
 
 ```bash
 onchainos wallet status
 ```
 
-检查账户地址：
+Check account addresses:
 
 ```bash
 onchainos wallet addresses --chain 196
 ```
 
-检查 VoteToken 余额：
+Check VoteToken balance:
 
 ```bash
 onchainos wallet balance \
@@ -266,13 +266,13 @@ onchainos wallet balance \
   --token-address 0x465b59670fC8b8b14a9B17A2A16E0cc8d65001B2
 ```
 
-构造 claim calldata：
+Build claim calldata:
 
 ```bash
 cast calldata "claim()"
 ```
 
-领取 token：
+Claim tokens:
 
 ```bash
 onchainos wallet contract-call \
